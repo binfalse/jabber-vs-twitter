@@ -48,7 +48,8 @@ Just run the script with
 	perl -w j-vs-t.pl
 
 For the first time you are asked to visit a website to authenticate. This
-website will off a pin, provide it to this tool and see how fine it works.
+website will offer a pin to you, provide it to this tool and see how fine it
+works.
 
 White the tool is running it sends status updates in your Twitter time line as 
 messages to the authorized account. Replies and retweets are send additionally.
