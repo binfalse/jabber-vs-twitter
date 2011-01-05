@@ -1,0 +1,94 @@
+====  Jabber -vs- Twitter  =====================================================
+
+Perl tool sending you news from Twitter to your Jabber account and sending
+status updates from Jabber to Twitter. It's free, open source and after some
+setup it's very easy to use!
+
+
+====  COPYRIGHT AND LICENCE  ===================================================
+
+Copyright (C) 2011 Martin Scharm
+
+This work is licensed under a
+Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
+For more information see see http://creativecommons.org/licenses/by-nc-sa/3.0/
+
+
+====  DEPENDENCIES  ============================================================
+
+The following Perl modules should be installed:
+
+ Net::Jabber::Bot;
+ Net::Twitter;
+ Date::Parse;
+ HTML::Entities;
+
+Example for installing Net::Jabber::Bot
+
+	perl -MCPAN -e shell
+	cpan[1]> install  Net::Jabber::Bot
+
+
+====  CONFIGURATION  ===========================================================
+
+All configuration stuff is located in j-vs-t.conf.
+
+1. Set up a Jabber account. Some popular servers can be found at
+http://www.jabberes.org/servers/.
+
+2. Set up a Twtitter account at http://twitter.com/
+
+3. Fill in your Jabber credentials and serversettings in j-vs-t.conf
+
+
+====  USAGE  ===================================================================
+
+Just run the script with
+
+	perl -w j-vs-t.pl
+
+For the first time you are asked to visit a website to authenticate. This
+website will off a pin, provide it to this tool and see how fine it works.
+
+White the tool is running it sends status updates in your Twitter time line as 
+messages to the authorized account. Replies and retweets are send additionally.
+
+Each message that arrives from the authorized user to the Jabber account the
+bot is listening on will be send to Twitter as status update. But keep in mind
+to leave them shorter than 140 chars, otherwise the bot won't send it and gives
+you an reply informing you about your failure.
+
+In addition you can send some command to the bot. These command start with an
+exclamation mark (!). Each message starting with ! is understood as command.
+The following commands are available:
+
+!help
+	list of available commands
+
+!follow [USER]
+	follow the user USER
+
+!unfollow [USER]
+	stop following the user USER
+
+!profile [USER]
+	print the profile of USER
+
+!following
+	list the users you are following
+
+!followers
+	list the users that follow you
+
+
+====  ERRORS  ==================================================================
+
+	Failed to re-connect: error
+Failed to connect to the Jabber server. Please check your Jabber credentials!
+
+
+====  MORE INFO  ===============================================================
+
+More information can be found at
+
+	http://blog.binfalse.de/software/jabber-vs-twitter
