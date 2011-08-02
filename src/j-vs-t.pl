@@ -120,7 +120,7 @@ sub unshortURL
 	my $respcode = 0;
 	my $respurl = "";
 	print "unshortening URL: $url" if ($DEBUG);
-	open CMD, "curl -s -I $url |";
+	open CMD, "curl -s -I '".$url."' |";
 	while (<CMD>)
 	{
 		if (m/^HTTP\S*\s+(\d+)/)
