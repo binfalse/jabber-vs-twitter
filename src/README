@@ -9,10 +9,18 @@ setup it's very easy to use!
 
 Copyright (C) 2011 Martin Scharm
 
-This work is licensed under a
-Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported License.
-For more information see see http://creativecommons.org/licenses/by-nc-sa/3.0/
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 ====  DEPENDENCIES  ============================================================
 
@@ -22,6 +30,8 @@ The following Perl modules should be installed:
  Net::Twitter;
  Date::Parse;
  HTML::Entities;
+ DateTime::Format::Strptime;
+ Data::Dumper;
 
 Example for installing Net::Jabber::Bot
 
@@ -40,6 +50,13 @@ http://www.jabberes.org/servers/.
 
 3. Fill in your Jabber credentials and serversettings in j-vs-t.conf
 
+4. Create a new Twitter App at
+https://dev.twitter.com/apps
+
+5. Store in your access tokens in j-vs-t.conf
+
+6. Store your consumer key and secret in j-vs-t.pl in $APPKEY and $APPSECRET
+
 
 ====  USAGE  ===================================================================
 
@@ -47,11 +64,7 @@ Just run the script with
 
 	perl -w j-vs-t.pl
 
-For the first time you are asked to visit a website to authenticate. This
-website will offer a pin to you, provide it to this tool and see how fine it
-works.
-
-White the tool is running it sends status updates in your Twitter time line as 
+While the tool is running it sends status updates in your Twitter time line as 
 messages to the authorized account. Replies and retweets are send additionally.
 
 Each message that arrives from the authorized user to the Jabber account the
@@ -82,11 +95,9 @@ The following commands are available:
 	list the users that follow you
 
 
-====  ERRORS  ==================================================================
+====  BUGS  ====================================================================
 
-	Failed to re-connect: error
-Failed to connect to the Jabber server. Please check your Jabber credentials!
-
+Bugs and feature requested are listed here: http://bt.binfalse.de
 
 ====  MORE INFO  ===============================================================
 
