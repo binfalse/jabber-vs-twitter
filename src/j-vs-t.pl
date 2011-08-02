@@ -131,6 +131,12 @@ sub unshortURL
 		if (m/^Location:\s+(\S+)\s*$/)
 		{
 			$respurl = $1;
+			if ($respurl =~ m/^\//i)
+			{
+				my $tmp = $url;
+				$tmp =~ s/^(\S+:\/\/[^\/]+)\/.*$/$1/;
+				$respurl = $tmp.$respurl;
+			}
 			next;
 		}
 	}
