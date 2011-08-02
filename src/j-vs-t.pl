@@ -21,8 +21,8 @@ use DateTime::Format::Strptime;
 use POSIX;
 use Data::Dumper;
 
-my $APPKEY = "APPKEY";
-my $APPSECRET = "APPSECRET";
+my $T_CONS_KEY = "t_cons_key";
+my $T_CONS_SEC = "t_cons_sec";
 my $CONF_FILE = "j-vs-t.conf";
 my $T_TOKEN = "t_token";
 my $T_SECRET = "t_secret";
@@ -44,9 +44,10 @@ my @DATECONV = (
 	DateTime::Format::Strptime->new (pattern => "%s"),
 );
 
-my $TWITTER = Net::Twitter->new(traits => ['API::REST', 'OAuth', 'WrapError'], consumer_key => $APPKEY, consumer_secret => $APPSECRET);
+my ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port) = readConf ();
 
-my ($t_token, $t_secret, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port) = readConf ();
+my $TWITTER = Net::Twitter->new(traits => ['API::REST', 'OAuth', 'WrapError'], consumer_key => $t_cons_key, consumer_secret => $t_cons_sec);
+
 if ($t_token && $t_secret)
 {
 	$TWITTER->access_token($t_token);
@@ -65,7 +66,7 @@ exit;
 
 sub reauthTwitter
 {
-	$TWITTER = Net::Twitter->new(traits => ['API::REST', 'OAuth', 'WrapError'], consumer_key => $APPKEY, consumer_secret => $APPSECRET);
+	$TWITTER = Net::Twitter->new(traits => ['API::REST', 'OAuth', 'WrapError'], consumer_key => $t_cons_key, consumer_secret => $t_cons_sec);
 	$TWITTER->access_token($t_token);
 	$TWITTER->access_token_secret($t_secret);
 	sendJabber ("had to reauth twitter...") if ($DEBUG);
@@ -78,6 +79,8 @@ sub readConf
 	my $file = $CONF_FILE;
 	my $t_token = undef;
 	my $t_secret = undef;
+	my $t_cons_key = undef;
+	my $t_cons_sec = undef;
 	my $j_user = undef;
 	my $j_pass = undef;
 	my $j_serv = undef;
@@ -100,6 +103,8 @@ sub readConf
 
 		$t_token = $value if ($key eq $T_TOKEN);
 		$t_secret = $value if ($key eq $T_SECRET);
+		$t_cons_key = $value if ($key eq $T_CONS_KEY);
+		$t_cons_sec = $value if ($key eq $T_CONS_SEC);
 		$j_user = $value if ($key eq $J_USER);
 		$j_pass = $value if ($key eq $J_PASS);
 		$j_serv = $value if ($key eq $J_SERV);
@@ -107,7 +112,7 @@ sub readConf
 		$j_port = $value if ($key eq $J_PORT);
 	}
 	close(CF);
-	return ($t_token, $t_secret, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port);
+	return ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port);
 }
 
 sub unshortURL
@@ -143,7 +148,7 @@ sub unshortURL
 	close CMD;
 	print " -> unshortened URL: $respurl ($respcode)" if ($DEBUG);
 
-	if ($respcode == 301 || $respcode == 302)
+	if (($respcode == 301 || $respcode == 302) && $respurl)
 	{
 		return unshortURL ($respurl, $it + 1);
 	}
@@ -151,6 +156,13 @@ sub unshortURL
 	{
 		return $url;
 	}
+}
+
+sub specChar
+{
+	my $char = shift;
+	return $char." " if ($char);
+	return "";
 }
 
 sub processMessage
@@ -177,7 +189,7 @@ sub processMessage
 		$by = "";
 	}
 	#replace shortened URLs
-	$msg =~ s/\s*(http:\/\/[a-zA-Z0-9]+\.[a-zA-Z]+\/[a-zA-Z0-9]+)\s*/" ".unshortURL ($1)." "/eg;
+	$msg =~ s/\s+(http:\/\/[a-zA-Z0-9]+\.[a-zA-Z]+\/[a-zA-Z0-9]+)([.,!?;:]?)(\s+|$)/" ".unshortURL ($1)." ".specChar ($2)/eg;
 	return "*" . $sender . $reply . "*" . ": ".$msg." [".$by.dateconv($date)."]";
 }
 
