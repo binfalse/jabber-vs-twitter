@@ -189,7 +189,7 @@ sub processMessage
 		$by = "";
 	}
 	#replace shortened URLs
-	$msg =~ s/\s+(http:\/\/[a-zA-Z0-9]+\.[a-zA-Z]+\/[a-zA-Z0-9]+)([.,!?;:]?)(\s+|$)/" ".unshortURL ($1)." ".specChar ($2)/eg;
+	$msg =~ s/\s+(http:\/\/[a-zA-Z0-9.]+\.[a-zA-Z]+\/[a-zA-Z0-9]+)([.,!?;:]?)(\s+|$)/" ".unshortURL ($1)." ".specChar ($2)/eg;
 	return "*" . $sender . $reply . "*" . ": ".$msg." [".$by.dateconv($date)."]";
 }
 
