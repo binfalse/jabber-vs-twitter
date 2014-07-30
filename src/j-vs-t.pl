@@ -20,6 +20,7 @@ use Switch;
 use DateTime::Format::Strptime;
 use POSIX;
 use Data::Dumper;
+use URI::Find;
 
 my $T_CONS_KEY = "t_cons_key";
 my $T_CONS_SEC = "t_cons_sec";
@@ -31,10 +32,12 @@ my $J_PASS = "j_pass";
 my $J_SERV = "j_serv";
 my $J_AUTH_USER = "j_auth_user";
 my $J_PORT = "j_port";
-my $LAST_DATE = time()-6*60;
+my $LAST_DATE = time()-60*60;
 my $LAST_FRIENDS = 0;
 my $LAST_MENTION = 0;
 my $LAST_RETWEET = 0;
+my $NUMRETRIEVE = 10;
+#my $NUMRETRIEVE = 2;
 my $DEBUG = 0;
 #my $DEBUG = 1;
 my @DATECONV = (
@@ -46,7 +49,7 @@ my @DATECONV = (
 
 my ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port) = readConf ();
 
-my $TWITTER = Net::Twitter->new(traits => ['API::REST', 'OAuth', 'WrapError'], consumer_key => $t_cons_key, consumer_secret => $t_cons_sec);
+my $TWITTER = Net::Twitter->new(traits => [ qw/API::RESTv1_1 RetryOnError OAuth WrapError/ ], consumer_key => $t_cons_key, consumer_secret => $t_cons_sec, ssl => 1);
 
 if ($t_token && $t_secret)
 {
@@ -54,9 +57,9 @@ if ($t_token && $t_secret)
 	$TWITTER->access_token_secret($t_secret);
 }
 
-die "failed to auth to twitter... please provide token in config\n" unless ( $TWITTER->authorized );
+die "failed to auth to twitter... please provide token in config ".$TWITTER->http_message."\n" unless ( $TWITTER->authorized );
 
-my $bot = Net::Jabber::Bot->new ({server => $j_serv, port => $j_port, username => $j_user, password => $j_pass, alias => $j_user, message_function => \&messageCheck, background_function => \&updateCheck, loop_sleep_time => 40, process_timeout => 5, forums_and_responses => {}, ignore_server_messages => 1, ignore_self_messages => 1, out_messages_per_second => 20, max_message_size => 1000, max_messages_per_hour => 1000});
+my $bot = Net::Jabber::Bot->new ({server => $j_serv, port => $j_port, username => $j_user, password => $j_pass, alias => $j_user, message_function => \&messageCheck, background_function => \&updateCheck, loop_sleep_time => 60, process_timeout => 5, forums_and_responses => {}, ignore_server_messages => 1, ignore_self_messages => 1, out_messages_per_second => 20, max_message_size => 1000, max_messages_per_hour => 1000});
 
 $bot->SendPersonalMessage($j_auth_user, "hey i'm back again!");
 $bot->Start();
@@ -66,10 +69,21 @@ exit;
 
 sub reauthTwitter
 {
-	$TWITTER = Net::Twitter->new(traits => ['API::REST', 'OAuth', 'WrapError'], consumer_key => $t_cons_key, consumer_secret => $t_cons_sec);
+	$TWITTER = Net::Twitter->new(traits => [ qw/API::RESTv1_1 RetryOnError OAuth WrapError/ ], consumer_key => $t_cons_key, consumer_secret => $t_cons_sec, ssl => 1);
 	$TWITTER->access_token($t_token);
 	$TWITTER->access_token_secret($t_secret);
 	sendJabber ("had to reauth twitter...") if ($DEBUG);
+	
+	my $err = $TWITTER->get_error;
+	if ($err or !$TWITTER->authorized)
+	{
+		print "ERROR reauthing:";
+		print Dumper $err;
+		sendJabber ("reauthing failed... ".$TWITTER->http_message) if ($DEBUG);
+	}
+	
+	
+	return $TWITTER;
 }
 
 
@@ -118,44 +132,32 @@ sub readConf
 sub unshortURL
 {
 	my $url = shift;
-	my $it = shift;
-	$it = 0 if (!$it);
-	return $url if ($it > 5);
 	return "[URL failed]" if (!$url);
-	my $respcode = 0;
-	my $respurl = "";
 	print "unshortening URL: $url" if ($DEBUG);
-	open CMD, "curl -s -I '".$url."' |";
+	open CMD, "curl -sIL '".$url."' 2>&1 | ";
 	while (<CMD>)
 	{
-		if (m/^HTTP\S*\s+(\d+)/)
+		my $line = $_;
+		print "---> ".$line if ($DEBUG);
+		if ($line =~ m/^location: (.*)$/i)
 		{
-			$respcode = $1;
-			next;
-		}
-		if (m/^Location:\s+(\S+)\s*$/)
-		{
-			$respurl = $1;
-			if ($respurl =~ m/^\//i)
+			my $tmp = $1;
+ 			$tmp =~ s/[^[:print:]]+//g;
+			
+			if ($tmp =~ m/^http/i)
 			{
-				my $tmp = $url;
-				$tmp =~ s/^(\S+:\/\/[^\/]+)\/.*$/$1/;
-				$respurl = $tmp.$respurl;
+				$url = $tmp;
 			}
-			next;
+			else
+			{
+				$url = $url.$tmp;
+			}
+			print  "---URL> ".$url."\n" if ($DEBUG);
 		}
-	}
+ 	}
 	close CMD;
-	print " -> unshortened URL: $respurl ($respcode)" if ($DEBUG);
-
-	if (($respcode == 301 || $respcode == 302) && $respurl)
-	{
-		return unshortURL ($respurl, $it + 1);
-	}
-	else
-	{
-		return $url;
-	}
+	print " -> unshortened URL: $url\n" if ($DEBUG);
+	return $url;
 }
 
 sub specChar
@@ -169,7 +171,11 @@ sub processMessage
 {
 	my $sender = shift;
 	my $msg = decode_entities (shift);
+	chomp ($msg);
+	$msg =~ s/[^[:print:]]+//g;
 	my $date = shift;
+	my $id = shift;
+	my $place = shift;
 	my $by = shift;
 	my $reply = "";
 	if ($by)
@@ -181,7 +187,7 @@ sub processMessage
 		}
 		else
 		{
-			$by = "by *".$by."*, ";
+			$by = " retweeted *".$by."* ";
 		}
 	}
 	else
@@ -189,8 +195,26 @@ sub processMessage
 		$by = "";
 	}
 	#replace shortened URLs
-	$msg =~ s/\s+(http:\/\/[a-zA-Z0-9.]+\.[a-zA-Z]+\/[a-zA-Z0-9]+)([.,!?;:]?)(\s+|$)/" ".unshortURL ($1)." ".specChar ($2)/eg;
-	return "*" . $sender . $reply . "*" . ": ".$msg." [".$by.dateconv($date)."]";
+	my $finalmsg = $msg;
+	my $finder = URI::Find->new(sub {
+		my($uri) = shift;
+    my $url = unshortURL ($uri);
+		print "expanded uri $uri to $url in ".$finalmsg . "\n\n" if ($DEBUG);
+		$finalmsg =~ s/$uri/$url/g if ($url);
+  });
+  $finder->find(\$msg);
+	
+	if ($place)
+	{
+		$place = " - $place";
+	}
+	else
+	{
+		$place = "";
+	}
+	
+	print "\n\n--FINAL MESSAGE:--".$finalmsg . "----\n\n" if ($DEBUG);
+	return "*" . $sender . $reply . "*"  . $by. ": ".$finalmsg." [".dateconv($date)."$place - $id]";
 }
 
 sub updateCheck
@@ -198,69 +222,65 @@ sub updateCheck
 	# check for new messages
 	my $bot= shift;
 	my $counter = shift;
-	print "background " if ($DEBUG);
+	print "background ".`date "+\%c"`."\n" if ($DEBUG);
 
 	# timeline ...
-	my $tweets = $TWITTER->friends_timeline({count => 7});
+	my $tweets = $TWITTER->home_timeline({count => $NUMRETRIEVE});
 	while (!defined($tweets))
 	{
-		reauthTwitter ();
-		print "undef " if ($DEBUG);
-		$tweets = $TWITTER->friends_timeline({count => 7});
+		sendJabber ("error getting home timeline: ".$TWITTER->http_message);
+		print "error getting home timeline: ";
+		print Dumper $TWITTER->get_error;
+		$TWITTER = reauthTwitter ();
+#		print "undef " if ($DEBUG);
+		$tweets = $TWITTER->home_timeline({count => $NUMRETRIEVE});
 		sleep 5;
 	}
-	print "got tweets " if ($DEBUG);
+	print "got tweets\n" if ($DEBUG);
 	my $new_date = $LAST_DATE;
 	foreach my $hash_ref (@$tweets)
 	{
 		if ($LAST_DATE < u_time($hash_ref->{'created_at'}))
 		{
-			sendJabber (processMessage ($hash_ref->{'user'}->{'screen_name'}, $hash_ref->{'text'}, $hash_ref->{'created_at'}));
+			print Dumper $hash_ref;
+			
+			if ($hash_ref->{'retweeted_status'})
+			{
+				sendJabber (processMessage ($hash_ref->{'user'}->{'screen_name'}, $hash_ref->{'retweeted_status'}->{'text'}, $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}, $hash_ref->{'retweeted_status'}->{'user'}->{'screen_name'}));
+			}
+			else
+			{
+				sendJabber (processMessage ($hash_ref->{'user'}->{'screen_name'}, $hash_ref->{'text'}, $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}));
+			}
 			$new_date = u_time($hash_ref->{'created_at'}) if ($new_date < u_time($hash_ref->{'created_at'}));
 			print "." if ($DEBUG);
 		}
 	}
 
 	# mentions ...
-	$tweets = $TWITTER->mentions({count => 7});
+	$tweets = $TWITTER->mentions({count => $NUMRETRIEVE});
 	while (!$tweets)
 	{
-		reauthTwitter ();
-		print "undef " if ($DEBUG);
-		$tweets = $TWITTER->mentions({count => 7});
+		sendJabber ("error getting mentions: ".$TWITTER->http_message);
+		print "error getting home timeline: ";
+		print Dumper $TWITTER->get_error;
+		$TWITTER = reauthTwitter ();
+#		print "undef " if ($DEBUG);
+		$tweets = $TWITTER->mentions({count => $NUMRETRIEVE});
 		sleep 5;
 	}
-	print "got replies " if ($DEBUG);
+	print "got replies \n" if ($DEBUG);
 	foreach my $hash_ref (@$tweets)
 	{
 		if ($LAST_DATE < u_time($hash_ref->{'created_at'}))
 		{
-			sendJabber (processMessage ($hash_ref->{'user'}->{'screen_name'}, $hash_ref->{'text'}, $hash_ref->{'created_at'}, "->reply<-"));
+			sendJabber (processMessage ($hash_ref->{'user'}->{'screen_name'}, $hash_ref->{'text'}, $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}, "->reply<-"));
 			$new_date = u_time($hash_ref->{'created_at'}) if ($new_date < u_time($hash_ref->{'created_at'}));
 			print "." if ($DEBUG);
 		}
 	}
-
-	# retweets ...
-	$tweets = $TWITTER->retweeted_to_me({count => 7, since_id => $LAST_RETWEET});
-	while (!$tweets)
-	{
-		reauthTwitter ();
-		print "undef " if ($DEBUG);
-		$tweets = $TWITTER->retweeted_to_me({count => 7, since_id => $LAST_RETWEET});
-		sleep 5;
-	}
-	print "got retweets " if ($DEBUG);
-	foreach my $hash_ref (@$tweets)
-	{
-		if ($LAST_DATE < u_time($hash_ref->{'created_at'}))
-		{
-			sendJabber (processMessage ($hash_ref->{'retweeted_status'}->{'user'}->{'screen_name'}, $hash_ref->{'retweeted_status'}->{'text'}, $hash_ref->{'retweeted_status'}->{'created_at'}, $hash_ref->{'user'}->{'screen_name'}));
-			$new_date = u_time($hash_ref->{'created_at'}) if ($new_date < u_time($hash_ref->{'created_at'}));
-			print "." if ($DEBUG);
-			$LAST_RETWEET = $hash_ref->{'id'} if ($hash_ref->{'id'} > $LAST_RETWEET);
-		}
-	}
+	
+	
 	print " done\n" if ($DEBUG);
 	$LAST_DATE = $new_date;
 }
@@ -284,14 +304,42 @@ sub messageCheck
 		{
 			case "!help"
 			{
-				sendJabber ("avaiable commands (commands begin with !):");
+				sendJabber ("avaiable commands (commands start with !):");
 				sendJabber ("!help - print this help message");
 				sendJabber ("!follow [USER] - follow the user USER");
 				sendJabber ("!unfollow [USER] - stop following the user USER");
 				sendJabber ("!profile [USER] - print the profile of USER");
-				sendJabber ("!following - list the users you are following");
-				sendJabber ("!followers - list the users that follow you");
-				sendJabber ("all messages that doesn't start with ! are understood as status update");
+				sendJabber ("!following - list users you are following");
+				sendJabber ("!followers - list users who follow you");
+				sendJabber ("!retweet [ID] - retweet message with id ID (last number in jabber message)");
+				sendJabber ("!favorite [ID] - favorites message with id ID (last number in jabber message)");
+				sendJabber ("all messages that do not start with an ! are interpreted as status update");
+			}
+			case "!retweet"
+			{
+				my $toretweet = $options[0];
+				my $ret = $TWITTER->retweet($toretweet);
+				if ($ret->{'id'})
+				{
+					sendJabber ("successfully retweeted!");
+				}
+				else
+				{
+					sendJabber ("retweeting failed... ".$TWITTER->http_message);
+				}
+			}
+			case "!favorite"
+			{
+				my $toretweet = $options[0];
+				my $ret = $TWITTER->create_favorite($toretweet);
+				if ($ret->{'id'})
+				{
+					sendJabber ("successfully favorited!");
+				}
+				else
+				{
+					sendJabber ("favoriting failed... ".$TWITTER->http_message);
+				}
 			}
 			case "!follow"
 			{
@@ -340,30 +388,53 @@ sub messageCheck
 				}
 				else
 				{
-					sendJabber ("failed");
+					sendJabber ("failed... " . $TWITTER->http_message);
 				}
 			}
 			case "!following"
 			{
-				my $ret = $TWITTER->friends();
-				my @hash = @$ret;
-				my $out = "you are following: ";
-				foreach my $k (@hash )
+				my $out = "*you are following:* ";
+				
+				my $page = 1;
+				for ( my $cursor = -1, my $ret; $cursor; $cursor = $ret->{next_cursor} )
 				{
-					$out .= "$k->{screen_name} ";
+					$ret = $TWITTER->friends({ cursor => $cursor });
+					my $users = $ret->{users};
+					foreach my $k (@$users)
+					{
+						$out .= "$k->{screen_name} ";
+					}
+					if ($page++ == 9)
+					{
+						$out .= " *[etc]*";
+						last;
+					}
 				}
 				sendJabber ($out);
 			}
 			case "!followers"
 			{
-				my $ret = $TWITTER->followers();
-				my @hash = @$ret;
-				my $out = "your followers: ";
-				foreach my $k (@hash )
+				my $out = "*your followers:* ";
+				
+				my $page = 1;
+				for ( my $cursor = -1, my $ret; $cursor; $cursor = $ret->{next_cursor} )
 				{
-					$out .= "$k->{screen_name} ";
+					$ret = $TWITTER->followers({ cursor => $cursor });
+					my $users = $ret->{users};
+					foreach my $k (@$users)
+					{
+						$out .= "$k->{screen_name} ";
+					}
+					if ($page++ == 9)
+					{
+						$out .= " *[etc]*";
+						last;
+					}
 				}
 				sendJabber ($out);
+				
+				
+				
 			}
 			else
 			{
@@ -391,7 +462,7 @@ sub tweet
 	}
 	if (length $status < 1)
 	{
-		sendJabber ("you tried to send 0 characters, thats no status brother...");
+		sendJabber ("you tried to send 0 characters, thats not a valid status...");
 		return;
 	}
 	
@@ -403,7 +474,7 @@ sub tweet
 	}
 	else
 	{
-		sendJabber ("failed to update your status");
+		sendJabber ("failed to update your status... " . $TWITTER->http_message);
 		sendJabber ("your message was: " . $status);
 		return;
 	}
