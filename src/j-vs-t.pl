@@ -274,7 +274,7 @@ sub updateCheck
 		$TWITTER = reauthTwitter ();
 #		print "undef " if ($DEBUG);
 		$tweets = $TWITTER->home_timeline({count => $NUMRETRIEVE});
-		sleep 5;
+		sleep 15;
 	}
 	print "got tweets\n" if ($DEBUG);
 	my $new_date = $LAST_DATE;
@@ -282,7 +282,7 @@ sub updateCheck
 	{
 		if ($LAST_DATE < u_time($hash_ref->{'created_at'}))
 		{
-			print Dumper $hash_ref;
+			#print Dumper $hash_ref;
 			
 			if ($hash_ref->{'retweeted_status'})
 			{
@@ -296,6 +296,7 @@ sub updateCheck
 			print "." if ($DEBUG);
 		}
 	}
+	print "tweets done\n" if ($DEBUG);
 
 	# mentions ...
 	$tweets = $TWITTER->mentions({count => $NUMRETRIEVE});
@@ -307,7 +308,7 @@ sub updateCheck
 		$TWITTER = reauthTwitter ();
 #		print "undef " if ($DEBUG);
 		$tweets = $TWITTER->mentions({count => $NUMRETRIEVE});
-		sleep 5;
+		sleep 15;
 	}
 	print "got replies \n" if ($DEBUG);
 	foreach my $hash_ref (@$tweets)
@@ -319,6 +320,7 @@ sub updateCheck
 			print "." if ($DEBUG);
 		}
 	}
+	print "mentions done\n" if ($DEBUG);
 	
 	
 	print " done\n" if ($DEBUG);
@@ -353,6 +355,7 @@ sub messageCheck
 				sendJabber ("!followers - list users who follow you");
 				sendJabber ("!retweet [ID] - retweet message with id ID (last number in jabber message)");
 				sendJabber ("!favorite [ID] - favorites message with id ID (last number in jabber message)");
+				sendJabber ("!delete [ID] - delete message with id ID (last number in jabber message, must be your message)");
 				sendJabber ("all messages that do not start with an ! are interpreted as status update");
 			}
 			case "!retweet"
@@ -370,8 +373,8 @@ sub messageCheck
 			}
 			case "!favorite"
 			{
-				my $toretweet = $options[0];
-				my $ret = $TWITTER->create_favorite($toretweet);
+				my $tofav = $options[0];
+				my $ret = $TWITTER->create_favorite($tofav);
 				if ($ret->{'id'})
 				{
 					sendJabber ("successfully favorited!");
@@ -379,6 +382,19 @@ sub messageCheck
 				else
 				{
 					sendJabber ("favoriting failed... ".$TWITTER->http_message);
+				}
+			}
+			case "!delete"
+			{
+				my $torm = $options[0];
+				my $ret = $TWITTER->destroy_status($torm);
+				if ($ret->{'id'})
+				{
+					sendJabber ("successfully deleted!");
+				}
+				else
+				{
+					sendJabber ("deletion failed... ".$TWITTER->http_message);
 				}
 			}
 			case "!follow"
