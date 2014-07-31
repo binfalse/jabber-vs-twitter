@@ -35,6 +35,7 @@ my $J_PORT = "j_port";
 my $A_NUMRETRIEVE = "a_num_tweets";
 my $A_DEBUG = "a_debug";
 my $A_UPDATE_TIME = "a_update_time";
+my $A_USE_TOR = "a_use_tor";
 
 my $MUTED = 0;
 my $LAST_DATE = time()-60*60;
@@ -50,11 +51,12 @@ my @DATECONV = (
     DateTime::Format::Strptime->new (pattern => "%s"),
 );
 
-my ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port, $update_time, $NUMRETRIEVE, $DEBUG) = readConf ();
+my ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port, $update_time, $NUMRETRIEVE, $DEBUG, $use_tor) = readConf ();
 
 $NUMRETRIEVE = 10 if (!$NUMRETRIEVE);
 $DEBUG = 0 if (!$DEBUG);
 $update_time = 60 if (!$update_time);
+$use_tor = 0 if (!$use_tor);
 
 my $TWITTER = Net::Twitter->new(traits => [ qw/API::RESTv1_1 RetryOnError OAuth WrapError/ ], consumer_key => $t_cons_key, consumer_secret => $t_cons_sec, ssl => 1);
 
@@ -169,9 +171,10 @@ sub readConf
 		$NUMRETRIEVE = $value if ($key eq $A_NUMRETRIEVE);
 		$DEBUG = $value if ($key eq $A_DEBUG);
 		$update_time = $value if ($key eq $A_UPDATE_TIME);
+		$use_tor = $value if ($key eq $A_USE_TOR);
 	}
 	close(CF);
-	return ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port, $update_time, $NUMRETRIEVE, $DEBUG);
+	return ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port, $update_time, $NUMRETRIEVE, $DEBUG, $use_tor);
 }
 
 sub unshortURL
@@ -179,7 +182,11 @@ sub unshortURL
 	my $url = shift;
 	return "[URL failed]" if (!$url);
 	print "unshortening URL: $url" if ($DEBUG);
-	open CMD, "curl -sIL '".$url."' 2>&1 | ";
+	
+	my $tor = "torsocks ";
+	$tor = "" if (!$use_tor);
+	
+	open CMD, $tor."curl -sIL '".$url."' 2>&1 | ";
 	while (<CMD>)
 	{
 		my $line = $_;

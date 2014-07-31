@@ -10,6 +10,9 @@ a_num_tweets = 10
 # print debugging output? (0/1)
 a_debug = 0
 
+# use tor to unshorten urls?
+a_use_tor = 0
+
 
 ###############
 #   JABBER    #
