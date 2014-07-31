@@ -91,13 +91,17 @@ unless ( $TWITTER->authorized )
 
 die "failed to auth to twitter... please provide token in config\n" unless ( $TWITTER->authorized );
 
-my $bot = Net::Jabber::Bot->new ({server => $j_serv, port => $j_port, username => $j_user, password => $j_pass, alias => $j_user, message_function => \&messageCheck, background_function => \&updateCheck, loop_sleep_time => $update_time, process_timeout => 5, forums_and_responses => {}, ignore_server_messages => 1, ignore_self_messages => 1, out_messages_per_second => 20, max_message_size => 1000, max_messages_per_hour => 1000});
+my $bot = createBot ();
 
-$bot->SendPersonalMessage($j_auth_user, "hey i'm back again!");
+sendJabber ("hey i'm back again!");
 $bot->Start();
 
 exit;
 
+sub createBot
+{
+	return Net::Jabber::Bot->new ({server => $j_serv, port => $j_port, username => $j_user, password => $j_pass, alias => $j_user, message_function => \&messageCheck, background_function => \&updateCheck, loop_sleep_time => $update_time, process_timeout => 5, forums_and_responses => {}, ignore_server_messages => 1, ignore_self_messages => 1, out_messages_per_second => 20, max_message_size => 5000, max_messages_per_hour => 1000});
+}
 
 sub reauthTwitter
 {
@@ -544,7 +548,28 @@ sub tweet
 sub sendJabber
 {
 	# send a message to the authorized user
-	$bot->SendPersonalMessage($j_auth_user, shift);
+	if (!$bot->jabber_client)
+	{
+		print "not connected....\n" if ($DEBUG);
+		$bot->Disconnect();
+		sleep 5;
+		print "creating new bot\n" if ($DEBUG);
+		eval {
+			$bot = createBot ();
+			sendJabber ("*had to reconnect..*   " . shift);
+			$bot->Start();
+		};
+		if ($@)
+		{
+			print "starting failed with: $@";
+			sleep 60;
+			sendJabber ("*had to reconnect..*   " . shift);
+		}
+	}
+	else
+	{
+		$bot->SendPersonalMessage($j_auth_user, shift);
+	}
 }
 
 sub dateconv
