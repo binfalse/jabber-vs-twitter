@@ -22,9 +22,9 @@ use POSIX;
 use Data::Dumper;
 use URI::Find;
 
+my $CONF_FILE = "j-vs-t.conf";
 my $T_CONS_KEY = "t_cons_key";
 my $T_CONS_SEC = "t_cons_sec";
-my $CONF_FILE = "j-vs-t.conf";
 my $T_TOKEN = "t_token";
 my $T_SECRET = "t_secret";
 my $J_USER = "j_user";
@@ -32,14 +32,16 @@ my $J_PASS = "j_pass";
 my $J_SERV = "j_serv";
 my $J_AUTH_USER = "j_auth_user";
 my $J_PORT = "j_port";
+my $A_NUMRETRIEVE = "a_num_tweets";
+my $A_DEBUG = "a_debug";
+my $A_UPDATE_TIME = "a_update_time";
+
 my $LAST_DATE = time()-60*60;
 my $LAST_FRIENDS = 0;
 my $LAST_MENTION = 0;
 my $LAST_RETWEET = 0;
-my $NUMRETRIEVE = 10;
-#my $NUMRETRIEVE = 2;
-my $DEBUG = 0;
-#my $DEBUG = 1;
+
+
 my @DATECONV = (
     DateTime::Format::Strptime->new (pattern => "%a %b %d %T %z %Y"),
     DateTime::Format::Strptime->new (pattern => "%a %T"), # this one will be displayed in your message
@@ -47,7 +49,11 @@ my @DATECONV = (
     DateTime::Format::Strptime->new (pattern => "%s"),
 );
 
-my ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port) = readConf ();
+my ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port, $update_time, $NUMRETRIEVE, $DEBUG) = readConf ();
+
+$NUMRETRIEVE = 10 if (!$NUMRETRIEVE);
+$DEBUG = 0 if (!$DEBUG);
+$update_time = 60 if (!$update_time);
 
 my $TWITTER = Net::Twitter->new(traits => [ qw/API::RESTv1_1 RetryOnError OAuth WrapError/ ], consumer_key => $t_cons_key, consumer_secret => $t_cons_sec, ssl => 1);
 
@@ -85,7 +91,7 @@ unless ( $TWITTER->authorized )
 
 die "failed to auth to twitter... please provide token in config\n" unless ( $TWITTER->authorized );
 
-my $bot = Net::Jabber::Bot->new ({server => $j_serv, port => $j_port, username => $j_user, password => $j_pass, alias => $j_user, message_function => \&messageCheck, background_function => \&updateCheck, loop_sleep_time => 60, process_timeout => 5, forums_and_responses => {}, ignore_server_messages => 1, ignore_self_messages => 1, out_messages_per_second => 20, max_message_size => 1000, max_messages_per_hour => 1000});
+my $bot = Net::Jabber::Bot->new ({server => $j_serv, port => $j_port, username => $j_user, password => $j_pass, alias => $j_user, message_function => \&messageCheck, background_function => \&updateCheck, loop_sleep_time => $update_time, process_timeout => 5, forums_and_responses => {}, ignore_server_messages => 1, ignore_self_messages => 1, out_messages_per_second => 20, max_message_size => 1000, max_messages_per_hour => 1000});
 
 $bot->SendPersonalMessage($j_auth_user, "hey i'm back again!");
 $bot->Start();
@@ -126,6 +132,9 @@ sub readConf
 	my $j_serv = undef;
 	my $j_auth_user = undef;
 	my $j_port = undef;
+	my $update_time = undef;
+	my $NUMRETRIEVE = undef;
+	my $DEBUG = undef;
 
 	open(CF,'<'.$file) or return ("", "");
 
@@ -145,14 +154,19 @@ sub readConf
 		$t_secret = $value if ($key eq $T_SECRET);
 		$t_cons_key = $value if ($key eq $T_CONS_KEY);
 		$t_cons_sec = $value if ($key eq $T_CONS_SEC);
+		
 		$j_user = $value if ($key eq $J_USER);
 		$j_pass = $value if ($key eq $J_PASS);
 		$j_serv = $value if ($key eq $J_SERV);
 		$j_auth_user = $value if ($key eq $J_AUTH_USER);
 		$j_port = $value if ($key eq $J_PORT);
+		
+		$NUMRETRIEVE = $value if ($key eq $A_NUMRETRIEVE);
+		$DEBUG = $value if ($key eq $A_DEBUG);
+		$update_time = $value if ($key eq $A_UPDATE_TIME);
 	}
 	close(CF);
-	return ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port);
+	return ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port, $update_time, $NUMRETRIEVE, $DEBUG);
 }
 
 sub unshortURL
