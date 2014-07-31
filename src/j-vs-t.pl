@@ -36,6 +36,7 @@ my $A_NUMRETRIEVE = "a_num_tweets";
 my $A_DEBUG = "a_debug";
 my $A_UPDATE_TIME = "a_update_time";
 
+my $MUTED = 0;
 my $LAST_DATE = time()-60*60;
 my $LAST_FRIENDS = 0;
 my $LAST_MENTION = 0;
@@ -263,6 +264,8 @@ sub processMessage
 
 sub updateCheck
 {
+	return if ($MUTED);
+	
 	# check for new messages
 	my $bot= shift;
 	my $counter = shift;
@@ -350,17 +353,22 @@ sub messageCheck
 		{
 			case "!help"
 			{
+				my $MUTE = "UNMUTED";
+				$MUTE = "MUTED" if ($MUTED);
+				sendJabber ("the bot is currently *$MUTE*");
 				sendJabber ("avaiable commands (commands start with !):");
-				sendJabber ("!help - print this help message");
-				sendJabber ("!break - set a break mark");
-				sendJabber ("!follow [USER] - follow the user USER");
-				sendJabber ("!unfollow [USER] - stop following the user USER");
-				sendJabber ("!profile [USER] - print the profile of USER");
-				sendJabber ("!following - list users you are following");
-				sendJabber ("!followers - list users who follow you");
-				sendJabber ("!retweet [ID] - retweet message with id ID (last number in jabber message)");
-				sendJabber ("!favorite [ID] - favorites message with id ID (last number in jabber message)");
-				sendJabber ("!delete [ID] - delete message with id ID (last number in jabber message, must be your message)");
+				sendJabber ("*!help* - print this help message");
+				sendJabber ("*!break* - set a break mark");
+				sendJabber ("*!follow [USER]* - follow the user USER");
+				sendJabber ("*!unfollow [USER]* - stop following the user USER");
+				sendJabber ("*!profile [USER]* - print the profile of USER");
+				sendJabber ("*!following* - list users you are following");
+				sendJabber ("*!followers* - list users who follow you");
+				sendJabber ("*!retweet [ID]* - retweet message with id ID (last number in jabber message)");
+				sendJabber ("*!favorite [ID]* - favorites message with id ID (last number in jabber message)");
+				sendJabber ("*!delete [ID]* - delete message with id ID (last number in jabber message, must be your message)");
+				sendJabber ("*!mute* - mute the bot: won't send status updates from twitter");
+				sendJabber ("*!unmute* - unmute the bot: keep sending twitter updates again");
 				sendJabber ("all messages that do not start with an ! are interpreted as status update");
 			}
 			case "!retweet"
@@ -401,6 +409,16 @@ sub messageCheck
 				{
 					sendJabber ("deletion failed... ".$TWITTER->http_message);
 				}
+			}
+			case "!mute"
+			{
+				$MUTED = 1;
+				sendJabber ("*MUTED*");
+			}
+			case "!unmute"
+			{
+				$MUTED = 0;
+				sendJabber ("*UNMUTED*");
 			}
 			case "!break"
 			{
