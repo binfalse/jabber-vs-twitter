@@ -348,6 +348,7 @@ sub messageCheck
 			{
 				sendJabber ("avaiable commands (commands start with !):");
 				sendJabber ("!help - print this help message");
+				sendJabber ("!break - set a break mark");
 				sendJabber ("!follow [USER] - follow the user USER");
 				sendJabber ("!unfollow [USER] - stop following the user USER");
 				sendJabber ("!profile [USER] - print the profile of USER");
@@ -396,6 +397,10 @@ sub messageCheck
 				{
 					sendJabber ("deletion failed... ".$TWITTER->http_message);
 				}
+			}
+			case "!break"
+			{
+				sendJabber ("--= *BREAK* =--");
 			}
 			case "!follow"
 			{
