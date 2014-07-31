@@ -41,10 +41,10 @@ my $NUMRETRIEVE = 10;
 my $DEBUG = 0;
 #my $DEBUG = 1;
 my @DATECONV = (
-	DateTime::Format::Strptime->new (pattern => "%a %b %d %T %z %Y"),
-	DateTime::Format::Strptime->new (pattern => "%a %T"), # this one will be displayed in your message
-	strftime("%z", localtime()),
-	DateTime::Format::Strptime->new (pattern => "%s"),
+    DateTime::Format::Strptime->new (pattern => "%a %b %d %T %z %Y"),
+    DateTime::Format::Strptime->new (pattern => "%a %T"), # this one will be displayed in your message
+    strftime("%z", localtime()),
+    DateTime::Format::Strptime->new (pattern => "%s"),
 );
 
 my ($t_token, $t_secret, $t_cons_key, $t_cons_sec, $j_user, $j_pass, $j_serv, $j_auth_user, $j_port) = readConf ();
@@ -53,11 +53,37 @@ my $TWITTER = Net::Twitter->new(traits => [ qw/API::RESTv1_1 RetryOnError OAuth 
 
 if ($t_token && $t_secret)
 {
-	$TWITTER->access_token($t_token);
-	$TWITTER->access_token_secret($t_secret);
+    $TWITTER->access_token($t_token);
+    $TWITTER->access_token_secret($t_secret);
 }
 
-die "failed to auth to twitter... please provide token in config ".$TWITTER->http_message."\n" unless ( $TWITTER->authorized );
+unless ( $TWITTER->authorized )
+{
+    # The client is not yet authorized: Do it now
+    print "Authorize this app at ", $TWITTER->get_authorization_url, " and enter the PIN#\n";
+
+    my $pin = <STDIN>; # wait for input
+    chomp $pin;
+
+    my($access_token, $access_token_secret, $user_id, $screen_name) = $TWITTER->request_access_token(verifier => $pin);
+    print "==== YOUR CREDENTIALS ====\n";
+    print "t_token = $access_token\nt_secret = $access_token_secret\n";
+    print "\n\nplease store them in $CONF_FILE";
+    print "\nshould i do that for you? (Y/n): ";
+    $pin = <STDIN>;
+    if ($pin =~ m/^\s*y/i)
+    {
+        open CF, '>>'.$CONF_FILE or die "cannot write $CONF_FILE";
+        print CF "t_token = $access_token\nt_secret = $access_token_secret\n";
+        close CF;
+    }
+    else
+    {
+        exit;
+    }
+}
+
+die "failed to auth to twitter... please provide token in config\n" unless ( $TWITTER->authorized );
 
 my $bot = Net::Jabber::Bot->new ({server => $j_serv, port => $j_port, username => $j_user, password => $j_pass, alias => $j_user, message_function => \&messageCheck, background_function => \&updateCheck, loop_sleep_time => 60, process_timeout => 5, forums_and_responses => {}, ignore_server_messages => 1, ignore_self_messages => 1, out_messages_per_second => 20, max_message_size => 1000, max_messages_per_hour => 1000});
 
