@@ -221,6 +221,7 @@ sub specChar
 
 sub processMessage
 {
+	my $msgit = shift;
 	my $sender = shift;
 	my $msg = decode_entities (shift);
 	chomp ($msg);
@@ -266,7 +267,7 @@ sub processMessage
 	}
 	
 	print "\n\n--FINAL MESSAGE:--".$finalmsg . "----\n\n" if ($DEBUG);
-	return "*" . $sender . $reply . "*"  . $by. ": ".$finalmsg." [".dateconv($date)."$place - $id]";
+	return "*" . $sender . $reply . "*"  . $by. $msgit .": ".$finalmsg." [".dateconv($date)."$place - $id]";
 }
 
 sub updateCheck
@@ -292,19 +293,40 @@ sub updateCheck
 	}
 	print "got tweets\n" if ($DEBUG);
 	my $new_date = $LAST_DATE;
+    my @msg = undef;
 	foreach my $hash_ref (@$tweets)
 	{
 		if ($LAST_DATE < u_time($hash_ref->{'created_at'}))
 		{
-			#print Dumper $hash_ref;
-			
 			if ($hash_ref->{'retweeted_status'})
 			{
-				sendJabber (processMessage ($hash_ref->{'user'}->{'screen_name'}, $hash_ref->{'retweeted_status'}->{'text'}, $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}, $hash_ref->{'retweeted_status'}->{'user'}->{'screen_name'}));
+				@msg = split "\n", $hash_ref->{'retweeted_status'}->{'text'};
+				for my $i (0 .. $#msg)
+				{
+					if (scalar @msg > 1)
+					{
+						sendJabber (processMessage (" [".($i + 1)."/".(scalar @msg)."]", $hash_ref->{'user'}->{'screen_name'}, $msg[$i], $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}, $hash_ref->{'retweeted_status'}->{'user'}->{'screen_name'}));
+					}
+					else
+					{
+						sendJabber (processMessage ("", $hash_ref->{'user'}->{'screen_name'}, $msg[$i], $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}, $hash_ref->{'retweeted_status'}->{'user'}->{'screen_name'}));
+					}
+				}
 			}
 			else
 			{
-				sendJabber (processMessage ($hash_ref->{'user'}->{'screen_name'}, $hash_ref->{'text'}, $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}));
+				@msg = split "\n", $hash_ref->{'text'};
+				for my $i (0 .. $#msg)
+				{
+					if (scalar @msg > 1)
+					{
+						sendJabber (processMessage (" [".($i + 1)."/".(scalar @msg)."]", $hash_ref->{'user'}->{'screen_name'}, $msg[$i], $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}));
+					}
+					else
+					{
+						sendJabber (processMessage ("", $hash_ref->{'user'}->{'screen_name'}, $msg[$i], $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}));
+					}
+				}
 			}
 			$new_date = u_time($hash_ref->{'created_at'}) if ($new_date < u_time($hash_ref->{'created_at'}));
 			print "." if ($DEBUG);
@@ -329,7 +351,18 @@ sub updateCheck
 	{
 		if ($LAST_DATE < u_time($hash_ref->{'created_at'}))
 		{
-			sendJabber (processMessage ($hash_ref->{'user'}->{'screen_name'}, $hash_ref->{'text'}, $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}, "->reply<-"));
+			@msg = split "\n", $hash_ref->{'text'};
+			for my $i (0 .. $#msg)
+			{
+				if (scalar @msg > 1)
+				{
+					sendJabber (processMessage (" [$i/".(scalar @msg)."]", $hash_ref->{'user'}->{'screen_name'}, $msg[$i], $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}, "->reply<-"));
+				}
+				else
+				{
+					sendJabber (processMessage ("", $hash_ref->{'user'}->{'screen_name'}, $msg[$i], $hash_ref->{'created_at'}, $hash_ref->{'id'}, $hash_ref->{'place'}->{'full_name'}, "->reply<-"));
+				}
+			}
 			$new_date = u_time($hash_ref->{'created_at'}) if ($new_date < u_time($hash_ref->{'created_at'}));
 			print "." if ($DEBUG);
 		}
