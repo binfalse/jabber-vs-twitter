@@ -103,7 +103,7 @@ exit;
 
 sub createBot
 {
-	return Net::Jabber::Bot->new ({server => $j_serv, port => $j_port, username => $j_user, password => $j_pass, alias => $j_user, message_function => \&messageCheck, background_function => \&updateCheck, loop_sleep_time => $update_time, process_timeout => 5, forums_and_responses => {}, ignore_server_messages => 1, ignore_self_messages => 1, out_messages_per_second => 20, max_message_size => 5000, max_messages_per_hour => 1000});
+	return Net::Jabber::Bot->new ({server => $j_serv, port => $j_port, username => $j_user, password => $j_pass, alias => $j_user, message_function => \&messageCheck, background_function => \&updateCheck, loop_sleep_time => $update_time, process_timeout => 5, forums_and_responses => {}, ignore_server_messages => 1, ignore_self_messages => 1, out_messages_per_second => 20, max_message_size => 5000, max_messages_per_hour => 1000, tls => 1});
 }
 
 sub reauthTwitter
